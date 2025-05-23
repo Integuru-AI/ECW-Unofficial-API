@@ -71,6 +71,7 @@ class ECWIntegration(Integration):
 
     async def close_session(self):
         await self.client_session.close()
+        logger.debug("Closed client session in EcwIntegrations")
 
     async def _handle_response(self, response: aiohttp.ClientResponse):
         response_text = await response.text()
@@ -135,7 +136,7 @@ class ECWIntegration(Integration):
 
         return _headers
 
-    async def get_facilities(self):
+    async def get_facilities(self, close_session: bool = True):
         logger.debug("Fetching list of all facilities")
         try:
             headers = await self._setup_headers()
@@ -156,9 +157,10 @@ class ECWIntegration(Integration):
             logger.debug(exc)
             raise
         finally:
-            await self.close_session()
+            if close_session:
+                await self.close_session()
 
-    async def get_providers(self, page: int):
+    async def get_providers(self, page: int, close_session: bool = True):
         logger.debug(f"Fetching page: {page} of providers")
         try:
             headers = await self._setup_headers()
@@ -180,9 +182,10 @@ class ECWIntegration(Integration):
             logger.debug(exc)
             raise
         finally:
-            await self.close_session()
+            if close_session:
+                await self.close_session()
 
-    async def get_provider(self, providerName: str):
+    async def get_provider(self, providerName: str, close_session: bool = True):
         logger.debug(f"Looking for provider: {providerName}")
         try:
             headers = await self._setup_headers()
@@ -204,9 +207,10 @@ class ECWIntegration(Integration):
             logger.debug(exc)
             raise
         finally:
-            await self.close_session()
+            if close_session:
+                await self.close_session()
 
-    async def get_reasons(self):
+    async def get_reasons(self, close_session: bool = True):
         logger.debug(f"Fetching reasons")
         try:
             headers = await self._setup_headers()
@@ -227,7 +231,8 @@ class ECWIntegration(Integration):
             logger.debug(exc)
             raise
         finally:
-            await self.close_session()
+            if close_session:
+                await self.close_session()
 
     async def get_appointments(self, get_appointments_request: GetAppointmentsRequest):
         logger.debug("Fetching list of appointments")
@@ -283,7 +288,9 @@ class ECWIntegration(Integration):
         finally:
             await self.close_session()
 
-    async def get_patients(self, get_patients_request: GetPatientsRequest):
+    async def get_patients(
+        self, get_patients_request: GetPatientsRequest, close_session: bool = True
+    ):
         try:
             logger.debug(
                 f"Searching patients with last name '{get_patients_request.lastName}'"
@@ -340,11 +347,14 @@ class ECWIntegration(Integration):
             logger.debug(exc)
             raise
         finally:
-            await self.close_session()
+            if close_session:
+                await self.close_session()
 
     async def validate_provider(self, provider_name: str):
         logger.debug(f"Validating provider/resource <{provider_name}>")
-        provider = await self.get_provider(providerName=provider_name)
+        provider = await self.get_provider(
+            providerName=provider_name, close_session=False
+        )
         provider_response = None
 
         if provider and len(provider.get("result")) > 0:
@@ -354,7 +364,7 @@ class ECWIntegration(Integration):
 
     async def validate_reason(self, reason_client: str):
         logger.debug(f"Validating reason: {reason_client}")
-        reasons = await self.get_reasons()
+        reasons = await self.get_reasons(close_session=False)
         reason_item = None
         for reason in reasons["reasons"]:
             if reason["name"].lower() == reason_client.lower():
@@ -373,7 +383,7 @@ class ECWIntegration(Integration):
 
     async def validate_facilities(self, facility_name: str):
         logger.debug(f"Validating user facility <{facility_name}>")
-        facilities_list = await self.get_facilities()
+        facilities_list = await self.get_facilities(close_session=False)
         facilities_res = None
 
         for facility in facilities_list["facilities"]:
@@ -393,7 +403,8 @@ class ECWIntegration(Integration):
                 GetPatientsRequest(
                     lastName=request.patient_name.split(",")[0],
                     firstName=request.patient_name.split(",")[-1],
-                )
+                ),
+                close_session=False,
             )
 
             if not patient_response.get("patients"):
